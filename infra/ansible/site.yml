@@ -1,0 +1,189 @@
+---
+- name: Configure CI server (Jenkins, Docker, Java 17/21, Maven, kubectl, Trivy)
+  hosts: ci
+  become: true
+  handlers:
+    - name: Restart Jenkins
+      ansible.builtin.systemd:
+        name: jenkins
+        enabled: true
+        state: restarted
+        daemon_reload: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install base packages, Java 17 (for app builds), and Java 21 (for Jenkins)
+      ansible.builtin.apt:
+        name:
+          - openjdk-17-jdk
+          - openjdk-21-jre-headless
+          - maven
+          - git
+          - docker.io
+          - unzip
+          - curl
+          - ca-certificates
+          - gnupg
+          - fontconfig
+        state: present
+
+    - name: Set system default java to Java 17 for Maven builds
+      ansible.builtin.command: update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+      changed_when: false
+
+    - name: Ensure /etc/apt/keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Add Jenkins 2026 apt signing key
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+        dest: /etc/apt/keyrings/jenkins-keyring.asc
+        mode: "0644"
+
+    - name: Add Jenkins apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc]
+          https://pkg.jenkins.io/debian-stable binary/
+        filename: jenkins
+        state: present
+
+    - name: Ensure Jenkins systemd drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/system/jenkins.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Configure Jenkins service to run on Java 21
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/jenkins.service.d/override.conf
+        content: |
+          [Service]
+          Environment="JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64"
+          Environment="JENKINS_JAVA_CMD=/usr/lib/jvm/java-21-openjdk-amd64/bin/java"
+        mode: "0644"
+      notify: Restart Jenkins
+
+    - name: Install Jenkins
+      ansible.builtin.apt:
+        name: jenkins
+        update_cache: true
+        state: present
+
+    - name: Start and enable Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Allow jenkins user to run Docker commands
+      ansible.builtin.user:
+        name: jenkins
+        groups: docker
+        append: true
+      notify: Restart Jenkins
+
+    - name: Ensure Jenkins service is running
+      ansible.builtin.systemd:
+        name: jenkins
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Flush handlers so Jenkins picks up docker group and Java 21
+      ansible.builtin.meta: flush_handlers
+
+    - name: Kernel settings required by SonarQube
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-sonarqube.conf
+        content: |
+          vm.max_map_count=262144
+          fs.file-max=65536
+        mode: "0644"
+
+    - name: Apply kernel settings
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+
+    - name: Create 2 GB swap file for SonarQube and Dependency-Check headroom
+      ansible.builtin.shell: |
+        fallocate -l 2G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      args:
+        creates: /swapfile
+
+    - name: Install kubectl (latest stable)
+      ansible.builtin.shell: |
+        KVER=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+        curl -fsSL -o /usr/local/bin/kubectl \
+          https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl
+        chmod 0755 /usr/local/bin/kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+    - name: Install Trivy
+      ansible.builtin.shell: >
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh
+        | sh -s -- -b /usr/local/bin
+      args:
+        creates: /usr/local/bin/trivy
+
+    - name: Wait for Jenkins to generate initialAdminPassword
+      ansible.builtin.wait_for:
+        path: /var/lib/jenkins/secrets/initialAdminPassword
+        timeout: 300
+
+    - name: Read Jenkins initial admin password
+      ansible.builtin.command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_pw
+      changed_when: false
+
+    - name: Show Jenkins initial admin password
+      ansible.builtin.debug:
+        msg: "Jenkins initial admin password: {{ jenkins_pw.stdout }}"
+
+- name: Configure Kubernetes server (k3s)
+  hosts: k8s
+  become: true
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure curl and ca-certificates are installed
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+        state: present
+
+    - name: Install k3s single-node cluster
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        INSTALL_K3S_EXEC="--write-kubeconfig-mode 644
+        --tls-san {{ ansible_host }}
+        --tls-san {{ ansible_default_ipv4.address }}" sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Wait until the Kubernetes node is Ready
+      ansible.builtin.command: >
+        k3s kubectl wait --for=condition=Ready node --all --timeout=180s
+      changed_when: false
+
+    - name: Download kubeconfig to local machine (gitignored)
+      ansible.builtin.fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: ./k3s.yaml
+        flat: true
