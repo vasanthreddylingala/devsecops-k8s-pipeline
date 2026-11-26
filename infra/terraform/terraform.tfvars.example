@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) and replace with your own public IP.
+# Find your public IP: curl -s https://checkip.amazonaws.com
+
+my_ip_cidr        = "203.0.113.10/32"
+region            = "ap-south-1"
+public_key_path   = "~/.ssh/devsecops-key.pub"
+ci_instance_type  = "t3.medium"
+k8s_instance_type = "t3.small"
