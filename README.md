@@ -54,8 +54,15 @@ Developer (macOS arm64) ──git push──► GitHub (devsecops-k8s-pipeline)
 - **Kubernetes (`k8s/`):** Namespace `devsecops`, 2 replicas, readiness/liveness probes, CPU/memory requests & limits, `runAsNonRoot: true`, `runAsUser: 10001`, `allowPrivilegeEscalation: false`, `capabilities.drop: ["ALL"]`. Verified zero-downtime rolling update (`1.0.0` -> `1.0.1`) and rollback (`kubectl rollout undo`).
 - **Monitoring (`monitoring/prometheus.yml`):** Scrapes `/actuator/prometheus` every 15s; Grafana Dashboard `4701` visualizes JVM heap, GC, threads, CPU, and HTTP request counts.
 
-## Screenshots Checklist
-1. `terraform apply` (5 resources) · 2. Ansible `PLAY RECAP` (`failed=0`) · 3. Jenkins Stage View (green `#13` + red `#7/#10/#12`) · 4. SonarQube `Passed` & `#10 Failed` · 5. Dependency-Check HTML report · 6. Trivy scan output · 7. `kubectl get pods -n devsecops` & live browser · 8. Grafana `4701` dashboard · 9. Docker Hub immutable tags
+## Screenshots
+1. **Grafana Live Observability (`devsecops-jvm`):**  
+   ![Grafana Dashboard](docs/screenshots/1-grafana-monitoring.jpg)
+2. **SonarQube Quality Gate (`Passed`, `100%` Coverage, `A/A/A`):**  
+   ![SonarQube Quality Gate](docs/screenshots/2-sonarqube-quality-gate.jpg)
+3. **Jenkins Pipeline Overview (`#14` & `#13` Green, `#12` Blocked, Test Trend):**  
+   ![Jenkins Pipeline Overview](docs/screenshots/3-jenkins-pipeline-overview.png)
+4. **Security Gate Enforcement (`#12` Blocked at Trivy CRITICAL CVEs):**  
+   ![Trivy Gate Blocked](docs/screenshots/4-gate3-trivy-blocked.jpg)
 
 ## Quick Start & Cleanup
 1. Copy `infra/terraform/terraform.tfvars.example` -> `terraform.tfvars` with your CIDR.

@@ -1,0 +1,103 @@
+{
+  "id": null,
+  "uid": "devsecops-jvm",
+  "title": "DevSecOps Demo - Spring Boot & JVM Observability",
+  "tags": ["spring-boot", "jvm", "devsecops"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "JVM Heap Used",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [
+        { "expr": "sum(jvm_memory_used_bytes{application=\"devsecops-demo\",area=\"heap\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "JVM Heap Committed",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [
+        { "expr": "sum(jvm_memory_committed_bytes{application=\"devsecops-demo\",area=\"heap\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Classes Loaded",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "targets": [
+        { "expr": "jvm_classes_loaded_classes{application=\"devsecops-demo\"}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total /api/hello Requests",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "targets": [
+        { "expr": "sum(http_server_requests_seconds_count{application=\"devsecops-demo\",uri=\"/api/hello\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JVM Heap Memory Over Time",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [
+        { "expr": "sum(jvm_memory_used_bytes{application=\"devsecops-demo\",area=\"heap\"})", "legendFormat": "Heap Used", "refId": "A" },
+        { "expr": "sum(jvm_memory_committed_bytes{application=\"devsecops-demo\",area=\"heap\"})", "legendFormat": "Heap Committed", "refId": "B" },
+        { "expr": "sum(jvm_memory_used_bytes{application=\"devsecops-demo\",area=\"nonheap\"})", "legendFormat": "Non-Heap Used", "refId": "C" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "HTTP Request Rate by Endpoint (req/s)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "sum by (uri) (rate(http_server_requests_seconds_count{application=\"devsecops-demo\"}[1m]))", "legendFormat": "{{uri}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Process CPU Usage (%)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "targets": [
+        { "expr": "process_cpu_usage{application=\"devsecops-demo\"} * 100", "legendFormat": "Process CPU %", "refId": "A" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "JVM GC Pause Duration (s/s)",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "cg5mjhfg6fojkb" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "sum by (cause) (rate(jvm_gc_pause_seconds_sum{application=\"devsecops-demo\"}[1m]))", "legendFormat": "{{cause}}", "refId": "A" }
+      ]
+    }
+  ]
+}
