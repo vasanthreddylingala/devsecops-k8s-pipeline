@@ -8,6 +8,8 @@ pipeline {
     }
 
     environment {
+        JAVA_HOME   = '/usr/lib/jvm/java-17-openjdk-amd64'
+        PATH+JDK    = '/usr/lib/jvm/java-17-openjdk-amd64/bin'
         APP_NAME    = 'devsecops-demo'
         DOCKER_USER = 'vasanthreddylingala'
         IMAGE_REPO  = 'devsecops-k8s-pipeline'
